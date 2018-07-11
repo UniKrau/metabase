@@ -74,6 +74,7 @@ class DefaultLanding extends React.Component {
 
   render() {
     const {
+      ancestors,
       collection,
       collectionId,
 
@@ -81,6 +82,7 @@ class DefaultLanding extends React.Component {
       pinned,
       unpinned,
 
+      isRoot,
       selected,
       selection,
       onToggleSelected,
@@ -104,10 +106,51 @@ class DefaultLanding extends React.Component {
     return (
       <Box>
         <Box>
+          <Flex
+            align="center"
+            pt={2}
+            pb={3}
+            px={4}
+            bg={pinned.length ? colors["bg-medium"] : null}
+          >
+            <Box>
+              <Box mb={1}>
+                <BrowserCrumbs
+                  crumbs={[
+                    ...ancestors.map(({ id, name }) => ({
+                      title: (
+                        <CollectionDropTarget collection={{ id }} margin={8}>
+                          {name}
+                        </CollectionDropTarget>
+                      ),
+                      to: Urls.collection(id),
+                    })),
+                  ]}
+                />
+              </Box>
+              <h1 style={{ fontWeight: 900 }}>{collection.name}</h1>
+            </Box>
+
+            <Flex ml="auto">
+              {collection &&
+                collection.can_write &&
+                !collection.personal_owner_id && (
+                  <Box ml={1}>
+                    <CollectionEditMenu
+                      collectionId={collectionId}
+                      isRoot={isRoot}
+                    />
+                  </Box>
+                )}
+              <Box ml={1}>
+                <CollectionBurgerMenu />
+              </Box>
+            </Flex>
+          </Flex>
           <Box>
             <Box>
               {pinned.length > 0 ? (
-                <Box mx={4} mt={2} mb={3}>
+                <Box px={4} pt={2} pb={3} bg={colors["bg-medium"]}>
                   <CollectionSectionHeading>{t`Pins`}</CollectionSectionHeading>
                   <PinDropTarget
                     pinIndex={pinned[pinned.length - 1].collection_position + 1}
@@ -163,7 +206,7 @@ class DefaultLanding extends React.Component {
                   )}
                 </PinDropTarget>
               )}
-              <Box pt={2} px={4} bg="white">
+              <Box pt={2} px={4}>
                 <Grid>
                   <GridItem w={collectionWidth}>
                     <Box pr={2}>
@@ -185,41 +228,43 @@ class DefaultLanding extends React.Component {
                       <PinDropTarget pinIndex={null} margin={8}>
                         <Box>
                           <ItemTypeFilterBar />
-                          <Box
-                            mb={selected.length > 0 ? 5 : 2}
-                            style={{
-                              position: "relative",
-                              height: ROW_HEIGHT * unpinned.length,
-                            }}
-                          >
-                            <VirtualizedList
-                              items={
-                                location.query.type
-                                  ? unpinned.filter(
-                                      u => u.model === location.query.type,
-                                    )
-                                  : unpinned
-                              }
-                              rowHeight={ROW_HEIGHT}
-                              renderItem={({ item, index }) => (
-                                <ItemDragSource
-                                  item={item}
-                                  selection={selection}
-                                >
-                                  <NormalItem
-                                    key={`${item.type}:${item.id}`}
+                          <Card>
+                            <Box
+                              mb={selected.length > 0 ? 5 : 2}
+                              style={{
+                                position: "relative",
+                                height: ROW_HEIGHT * unpinned.length,
+                              }}
+                            >
+                              <VirtualizedList
+                                items={
+                                  location.query.type
+                                    ? unpinned.filter(
+                                        u => u.model === location.query.type,
+                                      )
+                                    : unpinned
+                                }
+                                rowHeight={ROW_HEIGHT}
+                                renderItem={({ item, index }) => (
+                                  <ItemDragSource
                                     item={item}
-                                    collection={collection}
                                     selection={selection}
-                                    onToggleSelected={onToggleSelected}
-                                    onMove={moveItems =>
-                                      this.setState({ moveItems })
-                                    }
-                                  />
-                                </ItemDragSource>
-                              )}
-                            />
-                          </Box>
+                                  >
+                                    <NormalItem
+                                      key={`${item.type}:${item.id}`}
+                                      item={item}
+                                      collection={collection}
+                                      selection={selection}
+                                      onToggleSelected={onToggleSelected}
+                                      onMove={moveItems =>
+                                        this.setState({ moveItems })
+                                      }
+                                    />
+                                  </ItemDragSource>
+                                )}
+                              />
+                            </Box>
+                          </Card>
                         </Box>
                       </PinDropTarget>
                     ) : (
@@ -308,7 +353,7 @@ export const NormalItem = ({
   onToggleSelected,
   onMove,
 }) => (
-  <Link to={item.getUrl()}>
+  <Link to={item.getUrl()} px={1}>
     <EntityItem
       showSelect={selection.size > 0}
       selectable
@@ -413,53 +458,16 @@ class CollectionLanding extends React.Component {
 
     return (
       <Box>
-        <Box>
-          <Flex align="center" mt={2} mb={3} mx={4}>
-            <Box>
-              <Box mb={1}>
-                <BrowserCrumbs
-                  crumbs={[
-                    ...ancestors.map(({ id, name }) => ({
-                      title: (
-                        <CollectionDropTarget collection={{ id }} margin={8}>
-                          {name}
-                        </CollectionDropTarget>
-                      ),
-                      to: Urls.collection(id),
-                    })),
-                  ]}
-                />
-              </Box>
-              <h1 style={{ fontWeight: 900 }}>{currentCollection.name}</h1>
-            </Box>
-
-            <Flex ml="auto">
-              {currentCollection &&
-                currentCollection.can_write &&
-                !currentCollection.personal_owner_id && (
-                  <Box ml={1}>
-                    <CollectionEditMenu
-                      collectionId={collectionId}
-                      isRoot={isRoot}
-                    />
-                  </Box>
-                )}
-              <Box ml={1}>
-                <CollectionBurgerMenu />
-              </Box>
-            </Flex>
-          </Flex>
-        </Box>
-        <Box>
-          <DefaultLanding
-            collection={currentCollection}
-            collectionId={collectionId}
-          />
-          {
-            // Need to have this here so the child modals will show up
-            this.props.children
-          }
-        </Box>
+        <DefaultLanding
+          isRoot={isRoot}
+          ancestors={ancestors}
+          collection={currentCollection}
+          collectionId={collectionId}
+        />
+        {
+          // Need to have this here so the child modals will show up
+          this.props.children
+        }
       </Box>
     );
   }
