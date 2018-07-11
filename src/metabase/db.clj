@@ -11,6 +11,7 @@
              [config :as config]
              [util :as u]]
             [metabase.db.spec :as dbspec]
+            [puppetlabs.i18n.core :refer [trs]]
             [ring.util.codec :as codec]
             [toucan.db :as db])
   (:import com.mchange.v2.c3p0.ComboPooledDataSource
@@ -140,7 +141,7 @@
   ^Boolean [^Liquibase liquibase]
   (boolean (seq (.listUnrunChangeSets liquibase nil))))
 
-(defn- has-migration-lock?
+(defn- migration-lock-exists?
   "Is a migration lock in place for LIQUIBASE?"
   ^Boolean [^Liquibase liquibase]
   (boolean (seq (.listLocks liquibase))))
@@ -150,7 +151,7 @@
    There's a chance the lock will end up clearing up so we can run migrations normally."
   [^Liquibase liquibase]
   (u/auto-retry 5
-    (when (has-migration-lock? liquibase)
+    (when (migration-lock-exists? liquibase)
       (Thread/sleep 2000)
       (throw (Exception. (str "Database has migration lock; cannot run migrations. You can force-release these locks "
                               "by running `java -jar metabase.jar migrate release-locks`."))))))
@@ -167,9 +168,15 @@
   (when (has-unrun-migrations? liquibase)
     (log/info "Database has unrun migrations. Waiting for migration lock to be cleared...")
     (wait-for-migration-lock-to-be-cleared liquibase)
-    (log/info "Migration lock is cleared. Running migrations...")
-    (doseq [line (migrations-lines liquibase)]
-      (jdbc/execute! conn [line]))))
+    ;; while we were waiting for the lock, it was possible that another instance finished the migration(s), so make
+    ;; sure something still needs to be done...
+    (if (has-unrun-migrations? liquibase)
+      (do
+        (log/info "Migration lock is cleared. Running migrations...")
+        (doseq [line (migrations-lines liquibase)]
+          (jdbc/execute! conn [line])))
+      (log/info
+       (trs "Migration lock cleared, but nothing to do here! Migrations were finished by another instance.")))))
 
 (defn- force-migrate-up-if-needed!
   "Force migrating up. This does two things differently from `migrate-up-if-needed!`:
@@ -381,7 +388,20 @@
   [auto-migrate? db-details]
   (log/info "Running Database Migrations...")
   (if auto-migrate?
-    (migrate! db-details :up)
+    ;; There is a weird situation where running the migrations can cause a race condition: if two (or more) instances
+    ;; in a horizontal cluster are started at the exact same time, they can all start running migrations (and all
+    ;; acquire a lock) at the exact same moment. Since they all acquire a lock at the same time, none of them would
+    ;; have been blocked from starting by the lock being in place. (Yes, this not working sort of defeats the whole
+    ;; purpose of the lock in the first place, but this *is* Liquibase.)
+    ;;
+    ;; So what happens is one instance will ultimately end up commiting the transaction first (and succeed), while the
+    ;; others will fail due to duplicate tables or the like and have their transactions rolled back.
+    ;;
+    ;; However, we don't want to have that instance killed because its migrations failed for that reason, so retry a
+    ;; second time; this time, it will either run into the lock, or see that there are no migrations to run in the
+    ;; first place, and launch normally.
+    (u/auto-retry 1
+      (migrate! db-details :up))
     (print-migrations-and-quit! db-details))
   (log/info "Database Migrations Current ... " (u/emoji "✅")))
 

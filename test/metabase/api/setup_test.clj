@@ -14,7 +14,7 @@
     [true
      email]
     (tu/with-temporary-setting-values [admin-email nil]
-      [(tu/is-uuid-string? (:id (http/client :post 200 "setup" {:token (setup/create-token!)
+      [(tu/is-uuid-string? (:id (http/client :post 200 "setup" {:token (setup/setup-token)
                                                                 :prefs {:site_name "Metabase Test"}
                                                                 :user  {:first_name (tu/random-name)
                                                                         :last_name  (tu/random-name)
@@ -22,7 +22,7 @@
                                                                         :password   "anythingUP12!!"}})))
        (do
          ;; reset our setup token
-         (setup/create-token!)
+         (setup/setup-token)
          (public-settings/admin-email))])))
 
 
@@ -34,25 +34,25 @@
   (http/client :post 400 "setup" {:token "foobar"}))
 
 (expect {:errors {:site_name "value must be a non-blank string."}}
-  (http/client :post 400 "setup" {:token (setup/token-value)}))
+  (http/client :post 400 "setup" {:token (setup/setup-token)}))
 
 (expect {:errors {:first_name "value must be a non-blank string."}}
-  (http/client :post 400 "setup" {:token (setup/token-value)
+  (http/client :post 400 "setup" {:token (setup/setup-token)
                                   :prefs {:site_name "awesomesauce"}}))
 
 (expect {:errors {:last_name "value must be a non-blank string."}}
-  (http/client :post 400 "setup" {:token (setup/token-value)
+  (http/client :post 400 "setup" {:token (setup/setup-token)
                                   :prefs {:site_name "awesomesauce"}
                                   :user {:first_name "anything"}}))
 
 (expect {:errors {:email "value must be a valid email address."}}
-  (http/client :post 400 "setup" {:token (setup/token-value)
+  (http/client :post 400 "setup" {:token (setup/setup-token)
                                   :prefs {:site_name "awesomesauce"}
                                   :user {:first_name "anything"
                                          :last_name "anything"}}))
 
 (expect {:errors {:password "Insufficient password strength"}}
-  (http/client :post 400 "setup" {:token (setup/token-value)
+  (http/client :post 400 "setup" {:token (setup/setup-token)
                                   :prefs {:site_name "awesomesauce"}
                                   :user {:first_name "anything"
                                          :last_name "anything"
@@ -60,7 +60,7 @@
 
 ;; valid email + complex password
 (expect {:errors {:email "value must be a valid email address."}}
-  (http/client :post 400 "setup" {:token (setup/token-value)
+  (http/client :post 400 "setup" {:token (setup/setup-token)
                                   :prefs {:site_name "awesomesauce"}
                                   :user {:token "anything"
                                          :first_name "anything"
@@ -69,7 +69,7 @@
                                          :password "anything"}}))
 
 (expect {:errors {:password "Insufficient password strength"}}
-  (http/client :post 400 "setup" {:token (setup/token-value)
+  (http/client :post 400 "setup" {:token (setup/setup-token)
                                   :prefs {:site_name "awesomesauce"}
                                   :user {:token "anything"
                                          :first_name "anything"
@@ -86,4 +86,4 @@
   (http/client :post 400 "setup/validate" {:token "foobar"}))
 
 (expect {:errors {:engine "value must be a valid database engine."}}
-  (http/client :post 400 "setup/validate" {:token (setup/token-value)}))
+  (http/client :post 400 "setup/validate" {:token (setup/setup-token)}))
