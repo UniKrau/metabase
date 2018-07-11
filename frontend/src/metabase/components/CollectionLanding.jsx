@@ -117,7 +117,7 @@ class DefaultLanding extends React.Component {
                   >
                     <Grid>
                       {pinned.map((item, index) => (
-                        <GridItem w={1 / 3} className="relative">
+                        <GridItem w={1 / 3} className="relative" key={index}>
                           <ItemDragSource item={item}>
                             <PinnedItem
                               key={`${item.type}:${item.id}`}
